@@ -1,1 +1,1 @@
-web: gunicorn DrillGIS.DrillGIS.wsgi:application
+web: gunicorn --chdir DrillGIS DrillGIS.wsgi:application
