@@ -1,0 +1,15 @@
+setup:
+  addons:
+    - plan: 'heroku-postgresql:hobby-dev'
+      as: DATABASE
+  config: {}
+build:
+  packages:
+    - gdal-bin
+  languages:
+    - >-
+      https://buildpack-registry.s3.amazonaws.com/buildpacks/heroku-community/apt.tgz
+    - 'https://github.com/heroku/heroku-geo-buildpack'
+    - python
+run:
+  web: gunicorn drillgis.wsgi
