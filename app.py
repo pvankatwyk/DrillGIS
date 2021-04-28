@@ -15,7 +15,7 @@ colors = {
 app = dash.Dash(__name__)
 server = app.server
 
-geodf = gpd.read_file('DrillRuns.shp')
+geodf = gpd.read_file('shp/DrillRuns.shp')
 fig = px.scatter_mapbox(geodf,
                         lat=geodf.geometry.y, lon=geodf.geometry.x,
                         hover_name="job_type",
