@@ -1,5 +1,3 @@
-import pandas as pd
-import plotly.express as px
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -8,24 +6,16 @@ import geopandas as gpd
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import json
-import plotly.graph_objects as go
-
-# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-colors = {
-    'background': '#01152b',
-    'text': '#3080db'
-}
 
 colors = {
     'background': '#aad3df',
     'text': '#002b63'
 }
 
-# app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app = dash.Dash(__name__)
+server = app.server
 
-geodf = gpd.read_file('C:/Users/Peter/Google Drive/APS/Soil Classification/GIS/DrillRuns.shp')
+geodf = gpd.read_file('DrillRuns.shp')
 fig = px.scatter_mapbox(geodf,
                         lat=geodf.geometry.y, lon=geodf.geometry.x,
                         hover_name="job_type",
