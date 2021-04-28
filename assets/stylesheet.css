@@ -1,0 +1,94 @@
+.container {
+    background-color: #aad3df;
+    font-family: garamond;
+}
+.title {
+    color: #002b63;
+    text-align: left;
+    font-family: Garamond;
+    margin: 0px;
+    padding-left: 5px
+}
+
+.sidebar {
+    background-color: #aad3df;
+    display: inline-block;
+    vertical-align: top;
+    height: 100vh;
+}
+
+.author {
+    padding-bottom: 30px;
+    padding-left: 5px;
+}
+
+.graph {
+    display: inline-block;
+    /*
+    width: 80%;
+    height: 75%;
+    */
+
+}
+
+.DatePickerTitle {
+    padding-left: 5px;
+}
+
+.DateRangePickerInput {
+    background-color: #fff;
+    border: #002b63;
+}
+
+.DateRangePickerInput, .DateRangePickerInput_1, .DateRangePickerInput_withBorder {
+    border: 1px solid #002b63;
+}
+
+.DateRangePickerInput, .DateRangePickerInput_arrow_svg, .DateRangePickerInput_array_svg_1{
+    fill: #002b63;
+}
+
+.DateRangePickerInput, .DateInput {
+    background: #fff;
+}
+
+.DateInput_input__focused_2 {
+    background-color: #aaa;
+}
+
+.DateInput_input__focused {
+    border-bottom: 2px solid #002b63;
+}
+
+.DateInput_input {
+    color: #002b63;
+    font-size: 15px;
+    padding: 10px 10px 10px;
+}
+
+.DateRangePicker_picker {
+    background-color: #f2efe9;
+}
+
+.DayPicker__horizontal {
+    background: #f2efe9;
+}
+
+.CalendarDay__selected_span {
+    background: #002b63;
+    border: 1px double #002b63;
+}
+
+.CalendarMonth {
+    background: #f2efe9;
+}
+
+.CalendarMonthGrid {
+    background: #f2efe9;
+}
+
+
+
+.Select-value-label {
+    color: #002b63;
+}
