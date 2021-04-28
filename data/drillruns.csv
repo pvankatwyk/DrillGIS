@@ -1,0 +1,15 @@
+id,date,usda_class,mod_class,job_type,bit_diam,drill_type,lon,lat
+0,2021-03-23,McBeth silt loam,Sandy Loam,backream,4,spoon,-111.7323139,40.23750278
+3,2021-04-24,Gravelly Loam,Gravelly Loam,backream,5,spoon,-104.8646773,39.61411883
+5,2021-04-13,Silt Loam,Silt,enlarging,7,spoon,-78.61584704,35.66633659
+4,2021-04-19,Silty Loam,Silty Sand,drilling,6,roller cone,-78.19753899,37.3395688
+7,2021-03-28,Silty Sand,Silty Loam,drilling,8,spoon,-82.92964883,40.00628263
+6,2021-04-15,Sandy Gravel,Sandy Loam,drilling,4,pdc,-86.14539198,39.77098435
+9,2021-04-23,Sandy Loam,Sand,backream,6,spoon,-96.81224732,32.68589171
+8,2021-04-13,Sandy Loam,Silty Sand,drilling,4,roller cone,-94.72070706,39.06508951
+1,2021-04-15,Sand,Sandy Silt,drilling,4,spoon,-115.2178016,36.1630774
+10,2021-04-06,Silty Loam,Silty Loam,enlarging,9,spoon,-112.0282027,33.3656423
+2,2021-04-22,Clayey Loam,Sandy Loam,drilling,6,spoon,-122.6427696,45.44428731
+0,2021-03-23,McBeth silt loam,Sandy Loam,backream,5,spoon,-111.7323139,40.23750278
+0,2021-03-23,McBeth silt loam,Sandy Loam,backream,5,spoon,-111.7323139,40.23750278
+0,2021-03-23,McBeth silt loam,Sandy Loam,backream,5,spoon,-111.7323139,40.23750278

@@ -15,9 +15,9 @@ colors = {
 app = dash.Dash(__name__)
 server = app.server
 
-geodf = gpd.read_file('shp/DrillRuns.shp')
+geodf = pd.read_csv('data/drillruns.csv')
 fig = px.scatter_mapbox(geodf,
-                        lat=geodf.geometry.y, lon=geodf.geometry.x,
+                        lat=geodf.lat, lon=geodf.lon,
                         hover_name="job_type",
                         hover_data=["date", "drill_type", "usda_class", "mod_class"],
                         # color_discrete_sequence=[colors['background']],
@@ -172,7 +172,7 @@ def update_output(start_date, end_date, job_type, bit_type, bit_diam):
 
     if len(df) == 0:
         fig = px.scatter_mapbox(geodf,
-                                lat=geodf.geometry.y, lon=geodf.geometry.x,
+                                lat=geodf.lat, lon=geodf.lon,
                                 hover_name="job_type",
                                 hover_data=["date", "drill_type", 'bit_diam', "usda_class", "mod_class"],
                                 color_discrete_sequence=['red'],
@@ -198,7 +198,7 @@ def update_output(start_date, end_date, job_type, bit_type, bit_diam):
     else:
         try:
             fig = px.scatter_mapbox(df,
-                                    lat=df.geometry.y, lon=df.geometry.x,
+                                    lat=df.lat, lon=df.lon,
                                     hover_name="job_type",
                                     hover_data=["date", "drill_type", 'bit_diam', "usda_class", "mod_class"],
                                     color_discrete_sequence=['red'],
@@ -225,7 +225,7 @@ def update_output(start_date, end_date, job_type, bit_type, bit_diam):
 
         except KeyError:
             fig = px.scatter_mapbox(geodf,
-                                    lat=geodf.geometry.y, lon=geodf.geometry.x,
+                                    lat=geodf.lat, lon=geodf.lon,
                                     hover_name="job_type",
                                     hover_data=["date", "drill_type", "usda_class", "mod_class"],
                                     # color_discrete_sequence=[colors['background']],
