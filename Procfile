@@ -1,1 +1,1 @@
-web: gunicorn drillgis.wsgi
+web: gunicorn DrillGIS.wsgi
