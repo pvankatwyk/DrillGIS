@@ -1,18 +1,17 @@
-.container {
+/*.container {
     background-color: #aad3df;
     font-family: garamond;
 }
 .title {
     color: #002b63;
-    text-align: left;
+    text-align: center;
     font-family: Garamond;
     margin: 0px;
-    padding-left: 5px
+    padding-left: 0px
 }
 
 .sidebar {
     background-color: #aad3df;
-    display: inline-block;
     vertical-align: top;
     height: 100vh;
 }
@@ -23,12 +22,6 @@
 }
 
 .graph {
-    display: inline-block;
-    /*
-    width: 80%;
-    height: 75%;
-    */
-
 }
 
 .DatePickerTitle {
@@ -92,3 +85,4 @@
 .Select-value-label {
     color: #002b63;
 }
+*/
