@@ -1,1 +1,1 @@
-web: gunicorn DrillGIS:server
+web: gunicorn app:server
