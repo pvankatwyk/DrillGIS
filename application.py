@@ -5,52 +5,138 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import boto3
+import requests
+import json
+from boto3.dynamodb.conditions import Attr
+import numpy as np
 
 settings = {
-    # For dark mode...
-    # 'background': '#1f2630',
-    # 'background-2': '#252e3f',
-    # 'text': '#7fafdf',
-    # 'accent': '#2cfec1',
-
     'background': '#aad3df',
-    'background-2': '#daecf1',
-    'text': '#1f2630',
-    'accent': '#008f05',
-
+    'text': '#0f3057',
+    'accent': '#008891',
+    'background-2': '#e7e7de',
+    'company': '#2dcf11',
     'map_zoom': 3.25,
     'font-family': 'Open Sans, sans-serif'
 }
 
 app = dash.Dash(
-    __name__, meta_tags=[{"name": "viewport", "content": "width=device-width"}],
+    name=__name__,
+    meta_tags=[{"name": "viewport", "content": "width=device-width"}],
+    title='DrillGIS',
+    assets_folder="static", # Elastic Beanstalk recognizes "static folder"
+    assets_url_path="static"
 )
-server = app.server
+application = app.server
 
 
-def load_data(fp):
-    df = pd.read_csv(fp)
-    return df
+def authenticate(pin):
+    """
+    :param pin: Operator/Company pin to be validated (int or string)
+    :return: authenticated (boolean saying whether it has been authenticated or not)
+    status (dictionary containing account information)
+    """
+    api = r'https://dm9yykm2b4.execute-api.us-west-1.amazonaws.com/alpha/authentication'
+    data = {
+        "pin": str(pin)
+    }
+    data = json.dumps(data)
+    response = requests.post(api, data=data)
+    try:
+        response_dict = json.loads(response.text)
+        status = {'company': response_dict['company'], 'company_pin': response_dict['company_pin'],
+                  'acc_type': response_dict['acc_type'], "operator_pin": pin}
+        authenticated = True
+    except TypeError:
+        status = "Unable to authenticate PIN."
+        authenticated = False
+
+    return authenticated, status
+
+
+def get_company_pins():
+    """
+    :return: companies (dictionary of rows of companies to be used in classify_pin())
+    """
+    dynamodb = boto3.resource('dynamodb', region_name='us-west-1')
+    table = dynamodb.Table('auth')
+    response = table.scan(
+        FilterExpression=Attr("acc_type").eq("company")
+    )
+    companies = response['Items']
+    return companies
+
+
+def classify_pin(company_pin, companies):
+    """
+
+    :param company_pin: Company pin being used to classify rows by company
+    :param companies: Dictionary of unique companies
+    :return:
+    """
+    out = "Other"
+    for company in companies:
+        if company['company_pin'] == str(company_pin):
+            out = company['company']
+    return out
+
+
+def load_data():
+    dynamodb = boto3.resource('dynamodb', region_name='us-west-1')
+    table = dynamodb.Table('drill-data')
+    response = table.scan()
+    data = pd.DataFrame(response['Items'])
+    companies = get_company_pins()
+    data['company'] = data['job-id'].apply(lambda x: classify_pin(x[:6], companies))
+    data['operator_pin'] = data['job-id'].apply(lambda x: x[7:13])
+    for column in ['drill_depth', 'bit_diam']:
+        data[str(column)] = data[str(column)].apply(int)
+    for column in ['lon', 'lat', 'avg_rop']:
+        data[str(column)] = data[str(column)].apply(float)
+    return data
 
 
 # --- Functions to build graphics ---
-def build_map(data, empty=False):
+def build_map(data, empty=False, color=None, company=None):
     # Tokens for custom maps ---
     # acccess_token = "pk.eyJ1IjoicGxvdGx5bWFwYm94IiwiYSI6ImNrOWJqb2F4djBnMjEzbG50amg0dnJieG4ifQ.Zme1-Uzoi75IaFbieBDl3A"
     # mapbox_style = "mapbox://styles/plotlymapbox/cjvprkf3t1kns1cqjxuxmwixz"
     # token = "pk.eyJ1IjoicHZhbmthdHd5ayIsImEiOiJja29hbmF3bTMwMnNxMnVsaHEya3J1bjBmIn0.-_ESAo1-Qogpzv66fVrh5Q"
-
+    labels = {'Drillrun Operator': 'Operator', 'company_int': 'Operator Code', 'lat': 'Latitude',
+              'lon': 'Longitude', 'date': 'Date', 'machine_model': 'Machine Model', 'drill_type': 'Bit Type',
+              'bit_diam': 'Bit Diameter (in)', 'usda_class': 'Soil Classification (USDA)',
+              'mod_class': 'Soil Classification (Model)',
+              'weather': 'Temp (deg F)', 'avg_rop': 'Average ROP (ft/min)', 'bore_fluid': 'Bore Fluid',
+              'drill_depth': 'Drill Depth (ft)',
+              'job_type': 'Job Type'}
     opacity = 0 if empty else 1
-    map = px.scatter_mapbox(data,
-                            lat=data.lat, lon=data.lon,
-                            hover_name="job_type",
-                            hover_data=["date", "machine_model", "drill_type", 'bit_diam', "usda_class",
-                                        "mod_class",
-                                        "weather", "avg_rop", "bore_fluid", "drill_depth"],
-                            zoom=settings['map_zoom'],
-                            color_discrete_sequence=[settings['accent']],
-                            opacity=opacity
-                            )
+    if color is None:
+        map = px.scatter_mapbox(data,
+                                lat=data.lat, lon=data.lon,
+                                labels=labels,
+                                hover_data=['date', 'job_type', "machine_model", "drill_type", 'bit_diam', "usda_class",
+                                            "mod_class", "bore_fluid", "drill_depth", "avg_rop"],
+                                zoom=settings['map_zoom'],
+                                color_discrete_sequence=[settings['accent']],
+                                opacity=opacity
+                                )
+    else:
+        map = px.scatter_mapbox(data,
+                                lat=data.lat, lon=data.lon,
+                                hover_data=['date', 'job_type', "machine_model", "drill_type", 'bit_diam', "usda_class",
+                                            "mod_class", "bore_fluid", "drill_depth", "avg_rop"],
+                                zoom=settings['map_zoom'],
+                                labels=labels,
+                                opacity=opacity,
+                                color=data['Drillrun Operator'],
+                                color_discrete_map={
+                                    "Other": "grey",
+                                    company: color
+                                },
+                                size=data.company_int,
+                                size_max=8
+                                )
     map.update_layout(
         # Settings for custom maps --
         # mapbox_accesstoken=acccess_token,
@@ -61,29 +147,56 @@ def build_map(data, empty=False):
         plot_bgcolor=settings['background'],
         paper_bgcolor=settings['background'],
         font_color=settings['text'],
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ),
+        legend_traceorder="reversed",
     )
 
     return map
 
 
-def build_histogram(data, num_bins=10, empty=False):
+def build_histogram(data, num_bins=10, empty=False, company=None, color=None):
     opacity = 0 if empty else 1
-    hist = px.histogram(data,
-                        x='avg_rop',
-                        nbins=num_bins,
-                        color_discrete_sequence=[settings['accent']],
-                        opacity=opacity
-                        )
+    if company is not None:
+        hist = px.histogram(data,
+                            x='avg_rop',
+                            nbins=num_bins,
+                            color=data['Drillrun Operator'],
+                            color_discrete_map={
+                                "Other": "grey",
+                                company: color
+                            },
+                            # opacity=opacity,
+                            barmode='overlay'
+                            )
+    else:
+        hist = px.histogram(data,
+                            x='avg_rop',
+                            nbins=num_bins,
+                            color_discrete_sequence=[settings['accent']],
+                            opacity=opacity
+                            )
     hist.update_layout(
         bargap=0.025,
         xaxis_title_text='Average ROP (ft/min)',
         yaxis_title_text='Count',
         margin=dict(l=0, r=0, t=5, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor=settings['background-2']
+        plot_bgcolor=settings['background-2'],
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ),
+        legend_traceorder="reversed"
     )
     hist.update_xaxes(
-        range=[0, 5.5],
+        # range=[0, 5.5],
         color=settings['accent']
     )
 
@@ -94,34 +207,105 @@ def build_histogram(data, num_bins=10, empty=False):
     return hist
 
 
-def build_parameter_graph(parameter):
+def build_dist_plot(data, state, num_bins=10, company=False, color=None):
+    import plotly.figure_factory as ff
+    if not company:
+        x1 = data.avg_rop
+
+        hist_data = [x1]
+
+        group_labels = ['All Data']
+        colors = [settings['accent']]
+    else:
+        x1 = data.avg_rop.loc[data['Drillrun Operator'] == state]
+        x2 = data.avg_rop.loc[data['Drillrun Operator'] == 'Other']
+
+        hist_data = [x1, x2]
+
+        group_labels = [state, 'Other']
+        colors = [color, 'grey']
+
+    # Create distplot with curve_type set to 'normal'
+    fig = ff.create_distplot(hist_data, group_labels, colors=colors,
+                             bin_size=1 / num_bins * 4, show_rug=False)
+    fig.update_layout(
+        bargap=0.025,
+        xaxis_title_text='Average ROP (ft/min)',
+        yaxis_title_text='Distribution',
+        margin=dict(l=0, r=0, t=5, b=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor=settings['background-2'],
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ),
+        legend_traceorder="reversed",
+        legend_title_text="Drillrun Operator"
+    )
+    fig.update_xaxes(
+        # range=[0, 5.5],
+        color=settings['accent']
+    )
+
+    fig.update_yaxes(
+        color=settings['accent']
+    )
+    return fig
+
+
+def build_parameter_graph(data, parameter, company=None, color=None):
     if parameter is None:
         parameter = 'mod_class'
         label = 'Soil Type'
     else:
         label = parameter.title().replace('_', ' ')
 
-    # If the parameter is categorical, use boxplot
-    if parameter in ('job_type', 'machine_model', 'drill_type', 'bit_diam', 'bore_fluid', 'mod_class'):
-        plt = px.box(geodf, x=parameter, y='avg_rop', color_discrete_sequence=[settings['accent']])
-        plt.update_layout(
-            xaxis_title_text=label,
-            yaxis_title_text='Average ROP (ft/min)',
-            margin=dict(l=0, r=0, t=5, b=0),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor=settings['background-2']
-        )
+    if company is not None:
+        if parameter in ('job_type', 'machine_model', 'drill_type', 'bit_diam', 'bore_fluid', 'mod_class'):
+            plt = px.box(data,
+                         x=parameter,
+                         y='avg_rop',
+                         color=data['Drillrun Operator'],
+                         color_discrete_map={
+                             "Other": "grey",
+                             company: color
+                         }
+                         )
+        else:
+            # Else (the parameter is continuous), use scatterplot
+            plt = px.scatter(data,
+                             x=parameter,
+                             y='avg_rop',
+                             color=data['Drillrun Operator'],
+                             color_discrete_map={
+                                 "Other": "grey",
+                                 company: color
+                             }
+                             )
     else:
-        # Else (the parameter is continuous), use scatterplot
-        plt = px.scatter(geodf, x=parameter, y='avg_rop', color_discrete_sequence=[settings['accent']], )
-        plt.update_layout(
-            xaxis_title_text=parameter,
-            yaxis_title_text='Average ROP (ft/min)',
-            margin=dict(l=0, r=0, t=5, b=0),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor=settings['background-2']
-        )
+        # If the parameter is categorical, use boxplot
+        if parameter in ('job_type', 'machine_model', 'drill_type', 'bit_diam', 'bore_fluid', 'mod_class'):
+            plt = px.box(data, x=parameter, y='avg_rop', color_discrete_sequence=[settings['accent']])
+        else:
+            # Else (the parameter is continuous), use scatterplot
+            plt = px.scatter(data, x=parameter, y='avg_rop', color_discrete_sequence=[settings['accent']], )
 
+    plt.update_layout(
+        xaxis_title_text=label,
+        yaxis_title_text='Average ROP (ft/min)',
+        margin=dict(l=0, r=0, t=5, b=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor=settings['background-2'],
+        legend_traceorder="reversed",
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ),
+    )
     plt.update_xaxes(
         color=settings['accent']
     )
@@ -134,6 +318,7 @@ def build_parameter_graph(parameter):
 
 
 # --- Get Slider Bar Marks ---
+# TODO: Probably can avoid these functions using list comprehension
 def get_bitdiam_marks():
     bit_diam_marks = dict()
     for i in range(min(geodf.bit_diam), max(geodf.bit_diam + 1)):
@@ -155,7 +340,7 @@ def get_rop_marks():
     return rop_marks
 
 
-geodf = load_data(fp='data/drillruns.csv')
+geodf = load_data()
 
 # --- Configure Layout ---
 app.layout = \
@@ -165,6 +350,12 @@ app.layout = \
             'background-color': settings['background'],
         },
         children=[
+            dcc.Store(
+                id='store-state'
+            ),
+            dcc.Store(
+                id='store-color'
+            ),
             # Div for the entire container (background div)
             html.Div(
                 style={
@@ -191,12 +382,64 @@ app.layout = \
                                                 'text-align': 'center',
                                                 'margin-right': '10px'
                                             }),
-                                    html.P('Peter Van Katwyk, Advanced Process Solutions, Facebook',
+                                    html.P('Advanced Process Solutions, Middle Mile Infrastructure',
                                            style={
                                                'color': settings['text'],
-                                               'text-align': 'center'
+                                               'text-align': 'center',
+                                               'margin-right': '20px'
                                                # 'border-bottom': '3px solid ' + settings['text'],
                                            }),
+                                    html.P('User Credentials',
+                                           style={
+                                               'border-top': '3px solid ' + settings['text'],
+                                               'margin-top': '15px',
+                                               'margin-bottom': '0px',
+                                           },
+                                           ),
+                                    html.Div(
+                                        id='div-for-credentials',
+                                        className='row',
+                                        style={
+                                            'margin-right': '10px',
+                                        },
+                                        children=[
+                                            html.Div(
+                                                id='div-for-pin',
+                                                className='six columns',
+                                                children=[
+                                                    dcc.Input(
+                                                        id='pin',
+                                                        # type='password',
+                                                        placeholder='User PIN',
+                                                        style={
+                                                            'width': '100%'
+                                                        },
+                                                        value=None
+                                                    )
+                                                ],
+                                            ),
+                                            html.Div(
+                                                id='div-for-login',
+                                                # style={'margin-right': '5px'},
+                                                className='six columns',
+                                                children=[
+                                                    html.Button('Log In',
+                                                                id='log-in',
+                                                                style={
+                                                                    'width': '100%',
+                                                                    'border': '1px solid ' + settings['text'],
+                                                                },
+                                                                ),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                id='current-account',
+                                                style={
+                                                    'color': settings['text'],
+                                                }
+                                            )
+                                        ],
+                                    ),
 
                                     # Div for Date Dropdown
                                     html.Div(
@@ -206,8 +449,8 @@ app.layout = \
                                             html.P('Date Range',
                                                    style={
                                                        'color': settings['text'],
-                                                       'border-top': '3px solid ' + settings['text'],
-                                                       'margin-bottom': '0px'
+                                                       'margin-bottom': '0px',
+                                                       'margin-top': '10px'
                                                    }),
                                             dcc.DatePickerRange(
                                                 id='date-picker',
@@ -233,10 +476,14 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='job-type-dropdown',
                                                 options=[
-                                                    {'label': 'Drilling', 'value': 'drilling'},
-                                                    {'label': 'Pilot Hole', 'value': 'pilot hole'},
-                                                    {'label': 'Backream', 'value': 'backream'}
+                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.job_type)
                                                 ],
+                                                # [
+                                                #     {'label': 'Drilling', 'value': 'drilling'},
+                                                #     {'label': 'Pilot Hole', 'value': 'pilot hole'},
+                                                #     {'label': 'Backream', 'value': 'backream'},
+                                                #     {'label': 'Other', 'value': 'other'}
+                                                # ],
                                                 value=None
                                             ),
                                             html.P('Machine Model',
@@ -247,17 +494,19 @@ app.layout = \
                                                    }),
                                             dcc.Dropdown(
                                                 id='machine-model-dropdown',
-                                                options=[
-                                                    {'label': 'D8x12 HDD', 'value': 'D8x12 HDD'},
-                                                    {'label': 'D10x15 S3 HDD', 'value': 'D10x15 S3 HDD'},
-                                                    {'label': 'D20x22 S3 HDD', 'value': 'D20x22 S3 HDD'},
-                                                    {'label': 'D23x30 S3 HDD', 'value': 'D23x30 S3 HDD'},
-                                                    {'label': 'D23x30DR S3 HDD', 'value': 'D23x30DR S3 HDD'},
-                                                    {'label': 'D24x40 S3 HDD', 'value': 'D24x40 S3 HDD'},
-                                                    {'label': 'D40x55 S3 HDD', 'value': 'D40x55 S3 HDD'},
-                                                    {'label': 'D40x55DR S3 HDD', 'value': 'D40x55DR S3 HDD'},
-                                                    {'label': 'D60x90 S3 HDD', 'value': 'D60x90 S3 HDD'},
-                                                ],
+                                                options=[{'label': x, 'value': x} for x in set(geodf.machine_model)],
+                                                # [
+                                                #     {'label': 'D8x12 HDD', 'value': 'D8x12 HDD'},
+                                                #     {'label': 'D10x15 S3 HDD', 'value': 'D10x15 S3 HDD'},
+                                                #     {'label': 'D20x22 S3 HDD', 'value': 'D20x22 S3 HDD'},
+                                                #     {'label': 'D23x30 S3 HDD', 'value': 'D23x30 S3 HDD'},
+                                                #     {'label': 'D23x30DR S3 HDD', 'value': 'D23x30DR S3 HDD'},
+                                                #     {'label': 'D24x40 S3 HDD', 'value': 'D24x40 S3 HDD'},
+                                                #     {'label': 'D40x55 S3 HDD', 'value': 'D40x55 S3 HDD'},
+                                                #     {'label': 'D40x55DR S3 HDD', 'value': 'D40x55DR S3 HDD'},
+                                                #     {'label': 'D60x90 S3 HDD', 'value': 'D60x90 S3 HDD'},
+                                                #     {'label': 'Other', 'value': 'other'}
+                                                # ],
                                                 value=None
                                             ),
                                         ],
@@ -277,13 +526,17 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='bit-type',
                                                 options=[
-                                                    {'label': 'Spoon Bit', 'value': 'spoon'},
-                                                    {'label': 'Roller Cone Bit', 'value': 'roller cone'},
-                                                    {'label': 'PDC Bit', 'value': 'pdc'}
+                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.drill_type)
                                                 ],
+                                                # [
+                                                #     {'label': 'Spoon Bit', 'value': 'spoon'},
+                                                #     {'label': 'Roller Cone Bit', 'value': 'roller cone'},
+                                                #     {'label': 'PDC Bit', 'value': 'pdc'},
+                                                #     {'label': 'Other', 'value': 'other'}
+                                                # ],
                                                 value=None,
                                             ),
-                                            html.P('Bit Diameter',
+                                            html.P('Bit Diameter (in)',
                                                    style={
                                                        'color': settings['text'],
                                                        'margin-top': '10px',
@@ -305,10 +558,14 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='bore-fluid',
                                                 options=[
-                                                    {'label': 'Water-Based', 'value': 'water-based'},
-                                                    {'label': 'Oil-Based', 'value': 'oil-based'},
-                                                    {'label': 'Gaseous', 'value': 'gaseous'}
+                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.bore_fluid)
                                                 ],
+                                                # [
+                                                #     {'label': 'Water-Based', 'value': 'water-based'},
+                                                #     {'label': 'Oil-Based', 'value': 'oil-based'},
+                                                #     {'label': 'Gaseous', 'value': 'gaseous'},
+                                                #     {'label': 'Other', 'value': 'other'}
+                                                # ],
                                                 value=None,
                                             ),
                                         ],
@@ -319,7 +576,7 @@ app.layout = \
                                         className='div-for-dropdown',
                                         style={'margin-right': '10px'},
                                         children=[
-                                            html.P('Drill Depth',
+                                            html.P('Drill Depth (ft)',
                                                    style={
                                                        'color': settings['text'],
                                                        'margin-top': '10px',
@@ -332,7 +589,7 @@ app.layout = \
                                                 marks=get_depth_marks(),
                                                 value=[min(geodf.drill_depth), max(geodf.drill_depth)],
                                             ),
-                                            html.P('Average ROP (ft/min)',
+                                            html.P('Average Rate of Penetration (ROP) (ft/min)',
                                                    style={
                                                        'color': settings['text'],
                                                        'margin-top': '10px',
@@ -355,23 +612,26 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='soil-type',
                                                 options=[
-                                                    {'label': 'Gravel', 'value': 'Gravel'},
-                                                    {'label': 'Sandy Gravel', 'value': 'Sandy Gravel'},
-                                                    {'label': 'Loamy Gravel', 'value': 'Loamy Gravel'},
-                                                    {'label': 'Silty Gravel', 'value': 'Silty Gravel'},
-                                                    {'label': 'Sand', 'value': 'Sand'},
-                                                    {'label': 'Gravelly Sand', 'value': 'Gravely Sand'},
-                                                    {'label': 'Loamy Sand', 'value': 'Loamy Sand'},
-                                                    {'label': 'Silty Sand', 'value': 'Silty Sand'},
-                                                    {'label': 'Loam', 'value': 'Loam'},
-                                                    {'label': 'Gravelly Loam', 'value': 'Gravely Loam'},
-                                                    {'label': 'Sandy Loam', 'value': 'Sandy Loam'},
-                                                    {'label': 'Silty Loam', 'value': 'Silty Loam'},
-                                                    {'label': 'Silt', 'value': 'Silt'},
-                                                    {'label': 'Gravelly Silt', 'value': 'Gravely Silt'},
-                                                    {'label': 'Loamy Silt', 'value': 'Loamy Silt'},
-                                                    {'label': 'Sandy Silt', 'value': 'Sandy Silt'},
+                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.mod_class)
                                                 ],
+                                                # [
+                                                #     {'label': 'Gravel', 'value': 'Gravel'},
+                                                #     {'label': 'Sandy Gravel', 'value': 'Sandy Gravel'},
+                                                #     {'label': 'Loamy Gravel', 'value': 'Loamy Gravel'},
+                                                #     {'label': 'Silty Gravel', 'value': 'Silty Gravel'},
+                                                #     {'label': 'Sand', 'value': 'Sand'},
+                                                #     {'label': 'Gravelly Sand', 'value': 'Gravely Sand'},
+                                                #     {'label': 'Loamy Sand', 'value': 'Loamy Sand'},
+                                                #     {'label': 'Silty Sand', 'value': 'Silty Sand'},
+                                                #     {'label': 'Loam', 'value': 'Loam'},
+                                                #     {'label': 'Gravelly Loam', 'value': 'Gravely Loam'},
+                                                #     {'label': 'Sandy Loam', 'value': 'Sandy Loam'},
+                                                #     {'label': 'Silty Loam', 'value': 'Silty Loam'},
+                                                #     {'label': 'Silt', 'value': 'Silt'},
+                                                #     {'label': 'Gravelly Silt', 'value': 'Gravely Silt'},
+                                                #     {'label': 'Loamy Silt', 'value': 'Loamy Silt'},
+                                                #     {'label': 'Sandy Silt', 'value': 'Sandy Silt'},
+                                                # ],
                                                 placeholder='Select...',
                                                 # value=list(geodf.mod_class.unique()),
                                                 value=None
@@ -436,17 +696,23 @@ app.layout = \
                                                 id='bottom-text',
                                                 className='text-padding',
                                                 children=[
-                                                    html.P('DrillGIS v1.0.0',
+                                                    html.P('DrillGIS v1.2.1 - © 2021, All rights reserved.',
                                                            style={
                                                                'margin-bottom': '0px',
-                                                               'margin-top': '150px',
+                                                               'margin-top': '35px',
+                                                               'color': settings['text']
+                                                           }),
+                                                    html.P('Website Developer: Peter Van Katwyk',
+                                                           style={
+                                                               'font-size': '12px',
+                                                               'margin-bottom': '0px',
                                                                'color': settings['text']
                                                            }),
                                                     html.P('''Change the parameters listed above to subset the current 
                                             drilling data. The map and histogram will automatically update to show 
                                             the parameters that were selected above, whereas the ROP vs Parameter 
                                             comparison shows trends in the entire  dataset. This tool is property of 
-                                            Advanced Process Solutions & Facebook.''',
+                                            Advanced Process Solutions & Middle Mile Infrastructure.''',
                                                            style={
                                                                'font-size': '10px',
                                                                'color': settings['text'],
@@ -511,15 +777,37 @@ app.layout = \
                                                 },
                                                 children=[
                                                     html.Br(),
-                                                    html.P('Average ROP Histogram',
+                                                    html.P('Average Rate of Penetration Histogram',
                                                            style={
                                                                'color': settings['text']
                                                            }),
-                                                    dcc.Input(
-                                                        id='num-bins',
-                                                        type='number',
-                                                        placeholder='# Histogram Bins',
+                                                    html.Div(
+                                                        id='div-for-hist-settings',
+                                                        className='row',
+                                                        children=[
+                                                            dcc.Input(
+                                                                id='num-bins',
+                                                                type='number',
+                                                                className='six columns',
+                                                                placeholder='# Histogram Bins',
+                                                            ),
+                                                            dcc.Dropdown(
+                                                                id='hist-dist',
+                                                                className='six columns',
+                                                                style={
+                                                                    'width': '100%',
+                                                                    'margin-left': '10px'
+                                                                },
+                                                                placeholder='Select Plot Type',
+                                                                options=[
+                                                                    {'label': 'Histogram', 'value': 'hist_plot'},
+                                                                    {'label': 'Distribution', 'value': 'dist_plot'},
+                                                                ],
+                                                                value='hist_plot'
+                                                            )
+                                                        ]
                                                     ),
+
                                                     dcc.Graph(
                                                         id='rop-hist',
                                                     )
@@ -534,7 +822,7 @@ app.layout = \
                                                 },
                                                 children=[
                                                     html.Br(),
-                                                    html.P('ROP vs Parameter Comparison',
+                                                    html.P('Rate of Penetration vs Parameter Comparison',
                                                            style={
                                                                'color': settings['text']
                                                            }),
@@ -585,7 +873,10 @@ app.layout = \
     [Output(component_id='map', component_property='figure'),
      Output(component_id='drill-count', component_property='children'),
      Output(component_id='rop-hist', component_property='figure'),
-     Output(component_id='download-csv', component_property='data')],
+     Output(component_id='download-csv', component_property='data'),
+     Output(component_id='current-account', component_property='children'),
+     Output(component_id='store-state', component_property='data'),
+     Output(component_id='store-color', component_property='data')],
     [Input(component_id='date-picker', component_property='start_date'),
      Input(component_id='date-picker', component_property='end_date'),
      Input(component_id='job-type-dropdown', component_property='value'),
@@ -597,11 +888,17 @@ app.layout = \
      Input(component_id='avg-rop', component_property='value'),
      Input(component_id='soil-type', component_property='value'),
      Input(component_id='num-bins', component_property='value'),
-     Input(component_id='to-csv-button', component_property='n_clicks')],
-    [State(component_id='to-csv-button', component_property='n_clicks')]
+     Input(component_id='to-csv-button', component_property='n_clicks'),
+     Input(component_id='pin', component_property='value'),
+     Input(component_id='log-in', component_property='n_clicks'),
+     Input(component_id='hist-dist', component_property='value')
+     ],
+    [State(component_id='to-csv-button', component_property='n_clicks'),
+     State(component_id='log-in', component_property='n_clicks')]
 )
 def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam, bore_fluid, drill_depth,
-               avg_rop, soil_type, num_bins, download_click, prev_n_click):
+               avg_rop, soil_type, num_bins, download_click, pin, login_clicks, hist_dist, prev_n_click,
+               prev_log_click):
     """update_map
     Inputs: All buttons from dashboard
     Outputs: Map, data count, histogram, and download
@@ -636,9 +933,64 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     else:
         soil_type = [soil_type]
     if num_bins is None:
-        num_bins = 20
+        num_bins = 10
+
+    # Set up callback context to determine the button that was clicked
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        button_id = 'No clicks'
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    authenticated, status = authenticate(pin)
+    company_name = status['company'] if authenticated else None
+    pin_exists = True if pin not in (None, '') else False
+    login = True if login_clicks is not None and int(login_clicks) > 0 else False
+
+    company_color_dict = {
+        "Company 1": '#2dcf11',
+        "Company 2": '#4287f5',
+        "Company 3": '#db881a',
+        "Company 4": '#db1a20',
+    }
+
+    # if prev_log_click is not None and button_id == 'log-in':
+    #     prev_log_click -= 1
+    login_clicked = True if login_clicks is not None and prev_log_click != login_clicks else False
+    # login_clicked = True if login_clicks is not None else False
+
+    # if authenticated and pin_exists and login and login_clicked:
+    if authenticated and pin_exists and login:
+        operator = True if status['acc_type'] == "operator" else False
+        current_account = 'Logged in to: ' + str(company_name) + ' (Operator ' + str(status['operator_pin']) + ')' \
+            if operator else 'Logged in to: ' + str(company_name) + ' (Admin Account)'
+
+        if operator:
+            state = status['operator_pin']
+        else:
+            state = company_name
+        company_color = company_color_dict[str(company_name)]
+    # elif not authenticated and pin_exists and login and login_clicked:
+    elif not authenticated and pin_exists and login:
+        current_account = status
+        company_color = None
+        state = None
+    else:
+        current_account = "Enter user PIN."
+        company_color = None
+        state = None
 
     # Subset data based on button inputs
+    # if username is None and password is None:
+    if state is not None:
+        if operator:
+            geodf['Drillrun Operator'] = geodf['operator_pin'].apply(lambda x: str(state) if x == state else "Other")
+            geodf['operator_class'] = geodf['operator_pin'].apply(lambda x: x if x == state else "Other")
+        else:
+            geodf['Drillrun Operator'] = geodf['company'].apply(lambda x: state if x in state else "Other")
+            geodf['operator_class'] = np.array(geodf.company == state) * geodf['operator_pin']
+        geodf['company_int'] = geodf['Drillrun Operator'].apply(lambda x: 1 if x in "Other" else 2)
+
     df = geodf.loc[
         (geodf.datetime >= start_date_datetime) &
         (geodf.datetime <= end_date_datetime) &
@@ -655,48 +1007,84 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
         (geodf.mod_class.isin(soil_type))
         ]
 
-    # If the data is empty (there are no runs with the parameters specified), make the figures blank
-    if len(df) == 0:
-        map = build_map(geodf, empty=True)
-        hist = build_histogram(geodf, num_bins=num_bins, empty=True)
-        count = 'There are no drill runs during the specified time.'
-
-    else:
-        try:
-            map = build_map(df, empty=False)
-            hist = build_histogram(df, num_bins=num_bins, empty=False)
-            count = f'Currently showing {len(df)} drill run(s).'
-
-        except KeyError:
+    if state is not None:
+        # If the data is empty (there are no runs with the parameters specified), make the figures blank
+        if len(df) == 0:
             map = build_map(geodf, empty=True)
             hist = build_histogram(geodf, num_bins=num_bins, empty=True)
             count = 'There are no drill runs during the specified time.'
 
-    # Set up callback context to determine the button that was clicked
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        button_id = 'No clicks'
+        else:
+            try:
+
+                map = build_map(df, empty=False, color=company_color, company=state)
+                if hist_dist == 'dist_plot':
+                    try:
+                        hist = build_dist_plot(df, state=state, num_bins=num_bins, company=True, color=company_color)
+                    except ValueError:
+                        hist = build_histogram(geodf, num_bins=num_bins, empty=True)
+                else:
+                    hist = build_histogram(df, num_bins=num_bins, empty=False, company=state, color=company_color)
+
+                count = f'Currently showing {len(df)} drill run(s).'
+
+            except KeyError:
+                map = build_map(geodf, empty=True)
+                hist = build_histogram(geodf, num_bins=num_bins, empty=True)
+                count = 'There are no drill runs during the specified time.'
     else:
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        # If the data is empty (there are no runs with the parameters specified), make the figures blank
+        if len(df) == 0:
+            map = build_map(geodf, empty=True)
+            hist = build_histogram(geodf, num_bins=num_bins, empty=True)
+            count = 'There are no drill runs during the specified time.'
+
+        else:
+            try:
+                map = build_map(df, empty=False)
+                if hist_dist == 'dist_plot':
+                    hist = build_dist_plot(df, state=state, num_bins=num_bins, company=False)
+                else:
+                    hist = build_histogram(df, num_bins=num_bins, empty=False, company=None)
+                count = f'Currently showing {len(df)} drill run(s).'
+
+            except KeyError:
+                map = build_map(geodf, empty=True)
+                hist = build_histogram(geodf, num_bins=num_bins, empty=True)
+                count = 'There are no drill runs during the specified time.'
+
+    try:
+        df_to_csv = df.drop(columns=['company', 'datetime', 'company_int'])
+    except:
+        df_to_csv = df.drop(columns=['company', 'datetime'])
+
     # If the to-csv button has been clicked and the new click was the to-csv button again,
     # make the previous and current clicks different by one click
     if prev_n_click is not None and button_id == 'to-csv-button':
-        prev_n_click = prev_n_click - 1
+        prev_n_click -= - 1
 
     # If the to-csv button has been clicked and the previous vs current click numbers are different,
     # download the csv
     if download_click is not None and prev_n_click != download_click:
-        return map, count, hist, dcc.send_data_frame(df.to_csv, 'DrillGIS.csv')
+        send_to_csv = dcc.send_data_frame(df_to_csv.to_csv, 'DrillGIS.csv')
     else:
-        return map, count, hist, None
+        send_to_csv = None
+
+    return map, count, hist, send_to_csv, current_account, state, company_color
+
 
 # Callback for updating relational graph in the bottom-right
 @app.callback(
     [Output(component_id='rop-comparison', component_property='figure')],
-    [Input(component_id='parameter-dropdown', component_property='value')]
+    [Input(component_id='parameter-dropdown', component_property='value'),
+     Input(component_id='store-state', component_property='data'),
+     Input(component_id='store-color', component_property='data')]
 )
-def update_comparison(parameter):
-    fig = build_parameter_graph(parameter)
+def update_comparison(parameter, state, company_color):
+    if state is not None:
+        fig = build_parameter_graph(data=geodf, parameter=parameter, company=state, color=company_color)
+    else:
+        fig = build_parameter_graph(data=geodf, parameter=parameter, company=state)
     return fig
 
 

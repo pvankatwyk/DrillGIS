@@ -1,0 +1,68 @@
+:root {
+    --background: #aad3df;
+    --background2: #e7e7de;
+    --text: #0f3057;
+    --accent: #008891;
+}
+/*
+:root {
+    --background: #aad3df;
+    --background2: #daecf1;
+    --text: #1f2630;
+    --accent: #008f05;
+}
+*/
+body {
+    margin: 0;
+}
+.rc-slider-track {
+  background-color: var(--accent);
+}
+.DateInput_input_1 {
+    text-align: center;
+}
+
+.Select-control {
+    border: 1px solid var(--text);
+    background-color: var(--background2);
+}
+
+.DateRangePickerInput__withBorder {
+    border: 1px solid var(--text);
+}
+
+.DateRangePickerInput {
+    background-color: var(--background2);
+}
+
+.DateInput_input__focused {
+    background: var(--background2);
+}
+
+.DateInput {
+    background: var(--text);
+}
+
+.DateRangePickerInput_arrow_svg {
+    fill: var(--text);
+}
+
+.DateInput_input__focused_2 {
+    background-color: var(--background2);
+}
+
+.DateInput_input{
+    color: var(--text);
+}
+
+.Select-placeholder {
+    color: #757575;
+}
+
+.Select-value-label {
+    color:  var(--accent);
+}
+
+.rc-slider-mark-text-active{
+    color: var(--text);
+}
