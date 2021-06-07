@@ -96,7 +96,6 @@ def load_data():
         data[str(column)] = data[str(column)].apply(float)
     return data
 
-
 # --- Functions to build graphics ---
 def build_map(data, empty=False, color=None, company=None):
     # Tokens for custom maps ---
