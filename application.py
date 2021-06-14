@@ -25,7 +25,7 @@ app = dash.Dash(
     name=__name__,
     meta_tags=[{"name": "viewport", "content": "width=device-width"}],
     title='DrillGIS',
-    assets_folder="static", # Elastic Beanstalk recognizes "static folder"
+    assets_folder="static",  # Elastic Beanstalk recognizes "static folder"
     assets_url_path="static"
 )
 application = app.server
@@ -95,6 +95,7 @@ def load_data():
     for column in ['lon', 'lat', 'avg_rop']:
         data[str(column)] = data[str(column)].apply(float)
     return data
+
 
 # --- Functions to build graphics ---
 def build_map(data, empty=False, color=None, company=None):
@@ -317,7 +318,6 @@ def build_parameter_graph(data, parameter, company=None, color=None):
 
 
 # --- Get Slider Bar Marks ---
-# TODO: Probably can avoid these functions using list comprehension
 def get_bitdiam_marks():
     bit_diam_marks = dict()
     for i in range(min(geodf.bit_diam), max(geodf.bit_diam + 1)):
@@ -475,7 +475,8 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='job-type-dropdown',
                                                 options=[
-                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.job_type)
+                                                    {'label': x.title(), 'value': x.lower()} for x in
+                                                    set(geodf.job_type)
                                                 ],
                                                 # [
                                                 #     {'label': 'Drilling', 'value': 'drilling'},
@@ -525,7 +526,8 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='bit-type',
                                                 options=[
-                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.drill_type)
+                                                    {'label': x.title(), 'value': x.lower()} for x in
+                                                    set(geodf.drill_type)
                                                 ],
                                                 # [
                                                 #     {'label': 'Spoon Bit', 'value': 'spoon'},
@@ -557,7 +559,8 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='bore-fluid',
                                                 options=[
-                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.bore_fluid)
+                                                    {'label': x.title(), 'value': x.lower()} for x in
+                                                    set(geodf.bore_fluid)
                                                 ],
                                                 # [
                                                 #     {'label': 'Water-Based', 'value': 'water-based'},
@@ -611,7 +614,8 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='soil-type',
                                                 options=[
-                                                    {'label': x.title(), 'value': x.lower()} for x in set(geodf.mod_class)
+                                                    {'label': x.title(), 'value': x.lower()} for x in
+                                                    set(geodf.mod_class)
                                                 ],
                                                 # [
                                                 #     {'label': 'Gravel', 'value': 'Gravel'},
@@ -695,7 +699,7 @@ app.layout = \
                                                 id='bottom-text',
                                                 className='text-padding',
                                                 children=[
-                                                    html.P('DrillGIS v1.2.1 - © 2021, All rights reserved.',
+                                                    html.P('DrillGIS v1.2.2 - © 2021, All rights reserved.',
                                                            style={
                                                                'margin-bottom': '0px',
                                                                'margin-top': '35px',
@@ -930,7 +934,7 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     if soil_type is None:
         soil_type = list(geodf.mod_class.unique())
     else:
-        soil_type = [soil_type]
+        soil_type = [soil_type.title()]
     if num_bins is None:
         num_bins = 10
 
@@ -951,6 +955,10 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
         "Company 2": '#4287f5',
         "Company 3": '#db881a',
         "Company 4": '#db1a20',
+        "Demo Company": '#82B674',
+        "Development": '#8F3191',
+        "Facebook Infrastructure": '#4A67C1',
+        "Vermeer": '#1C8343'
     }
 
     # if prev_log_click is not None and button_id == 'log-in':
@@ -1056,6 +1064,12 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
         df_to_csv = df.drop(columns=['company', 'datetime', 'company_int'])
     except:
         df_to_csv = df.drop(columns=['company', 'datetime'])
+
+    if not authenticated:
+        try:
+            df_to_csv = df_to_csv.drop(columns=['Drillrun Operator', 'operator_class', 'operator_pin'])
+        except:
+            pass
 
     # If the to-csv button has been clicked and the new click was the to-csv button again,
     # make the previous and current clicks different by one click
