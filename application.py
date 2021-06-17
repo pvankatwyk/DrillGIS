@@ -70,7 +70,6 @@ def get_company_pins():
 
 def classify_pin(company_pin, companies):
     """
-
     :param company_pin: Company pin being used to classify rows by company
     :param companies: Dictionary of unique companies
     :return:
@@ -355,6 +354,15 @@ app.layout = \
             dcc.Store(
                 id='store-color'
             ),
+            dcc.Store(
+                id='store-pin'
+            ),
+            dcc.Store(
+                id='store-auth'
+            ),
+            dcc.Store(
+                id='store-operator'
+            ),
             # Div for the entire container (background div)
             html.Div(
                 style={
@@ -478,12 +486,6 @@ app.layout = \
                                                     {'label': x.title(), 'value': x.lower()} for x in
                                                     set(geodf.job_type)
                                                 ],
-                                                # [
-                                                #     {'label': 'Drilling', 'value': 'drilling'},
-                                                #     {'label': 'Pilot Hole', 'value': 'pilot hole'},
-                                                #     {'label': 'Backream', 'value': 'backream'},
-                                                #     {'label': 'Other', 'value': 'other'}
-                                                # ],
                                                 value=None
                                             ),
                                             html.P('Machine Model',
@@ -495,18 +497,6 @@ app.layout = \
                                             dcc.Dropdown(
                                                 id='machine-model-dropdown',
                                                 options=[{'label': x, 'value': x} for x in set(geodf.machine_model)],
-                                                # [
-                                                #     {'label': 'D8x12 HDD', 'value': 'D8x12 HDD'},
-                                                #     {'label': 'D10x15 S3 HDD', 'value': 'D10x15 S3 HDD'},
-                                                #     {'label': 'D20x22 S3 HDD', 'value': 'D20x22 S3 HDD'},
-                                                #     {'label': 'D23x30 S3 HDD', 'value': 'D23x30 S3 HDD'},
-                                                #     {'label': 'D23x30DR S3 HDD', 'value': 'D23x30DR S3 HDD'},
-                                                #     {'label': 'D24x40 S3 HDD', 'value': 'D24x40 S3 HDD'},
-                                                #     {'label': 'D40x55 S3 HDD', 'value': 'D40x55 S3 HDD'},
-                                                #     {'label': 'D40x55DR S3 HDD', 'value': 'D40x55DR S3 HDD'},
-                                                #     {'label': 'D60x90 S3 HDD', 'value': 'D60x90 S3 HDD'},
-                                                #     {'label': 'Other', 'value': 'other'}
-                                                # ],
                                                 value=None
                                             ),
                                         ],
@@ -529,12 +519,6 @@ app.layout = \
                                                     {'label': x.title(), 'value': x.lower()} for x in
                                                     set(geodf.drill_type)
                                                 ],
-                                                # [
-                                                #     {'label': 'Spoon Bit', 'value': 'spoon'},
-                                                #     {'label': 'Roller Cone Bit', 'value': 'roller cone'},
-                                                #     {'label': 'PDC Bit', 'value': 'pdc'},
-                                                #     {'label': 'Other', 'value': 'other'}
-                                                # ],
                                                 value=None,
                                             ),
                                             html.P('Bit Diameter (in)',
@@ -562,12 +546,6 @@ app.layout = \
                                                     {'label': x.title(), 'value': x.lower()} for x in
                                                     set(geodf.bore_fluid)
                                                 ],
-                                                # [
-                                                #     {'label': 'Water-Based', 'value': 'water-based'},
-                                                #     {'label': 'Oil-Based', 'value': 'oil-based'},
-                                                #     {'label': 'Gaseous', 'value': 'gaseous'},
-                                                #     {'label': 'Other', 'value': 'other'}
-                                                # ],
                                                 value=None,
                                             ),
                                         ],
@@ -617,24 +595,6 @@ app.layout = \
                                                     {'label': x.title(), 'value': x.lower()} for x in
                                                     set(geodf.mod_class)
                                                 ],
-                                                # [
-                                                #     {'label': 'Gravel', 'value': 'Gravel'},
-                                                #     {'label': 'Sandy Gravel', 'value': 'Sandy Gravel'},
-                                                #     {'label': 'Loamy Gravel', 'value': 'Loamy Gravel'},
-                                                #     {'label': 'Silty Gravel', 'value': 'Silty Gravel'},
-                                                #     {'label': 'Sand', 'value': 'Sand'},
-                                                #     {'label': 'Gravelly Sand', 'value': 'Gravely Sand'},
-                                                #     {'label': 'Loamy Sand', 'value': 'Loamy Sand'},
-                                                #     {'label': 'Silty Sand', 'value': 'Silty Sand'},
-                                                #     {'label': 'Loam', 'value': 'Loam'},
-                                                #     {'label': 'Gravelly Loam', 'value': 'Gravely Loam'},
-                                                #     {'label': 'Sandy Loam', 'value': 'Sandy Loam'},
-                                                #     {'label': 'Silty Loam', 'value': 'Silty Loam'},
-                                                #     {'label': 'Silt', 'value': 'Silt'},
-                                                #     {'label': 'Gravelly Silt', 'value': 'Gravely Silt'},
-                                                #     {'label': 'Loamy Silt', 'value': 'Loamy Silt'},
-                                                #     {'label': 'Sandy Silt', 'value': 'Sandy Silt'},
-                                                # ],
                                                 placeholder='Select...',
                                                 # value=list(geodf.mod_class.unique()),
                                                 value=None
@@ -877,9 +837,7 @@ app.layout = \
      Output(component_id='drill-count', component_property='children'),
      Output(component_id='rop-hist', component_property='figure'),
      Output(component_id='download-csv', component_property='data'),
-     Output(component_id='current-account', component_property='children'),
-     Output(component_id='store-state', component_property='data'),
-     Output(component_id='store-color', component_property='data')],
+     ],
     [Input(component_id='date-picker', component_property='start_date'),
      Input(component_id='date-picker', component_property='end_date'),
      Input(component_id='job-type-dropdown', component_property='value'),
@@ -892,22 +850,24 @@ app.layout = \
      Input(component_id='soil-type', component_property='value'),
      Input(component_id='num-bins', component_property='value'),
      Input(component_id='to-csv-button', component_property='n_clicks'),
-     Input(component_id='pin', component_property='value'),
-     Input(component_id='log-in', component_property='n_clicks'),
-     Input(component_id='hist-dist', component_property='value')
+     Input(component_id='hist-dist', component_property='value'),
+     Input(component_id='store-auth', component_property='data'),
+     Input(component_id='store-state', component_property='data'),
+     Input(component_id='store-color', component_property='data'),
+     Input(component_id='store-operator', component_property='data')
      ],
     [State(component_id='to-csv-button', component_property='n_clicks'),
-     State(component_id='log-in', component_property='n_clicks')]
+     ]
 )
 def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam, bore_fluid, drill_depth,
-               avg_rop, soil_type, num_bins, download_click, pin, login_clicks, hist_dist, prev_n_click,
-               prev_log_click):
+               avg_rop, soil_type, num_bins, download_click, hist_dist, authenticated, state, company_color,
+               operator, prev_n_click):
     """update_map
     Inputs: All buttons from dashboard
     Outputs: Map, data count, histogram, and download
     Description: Uses all the button inputs to subset the graph and display the subset on the map and histogram. It also
     counts the rows of the data to display how many data points are being shown, and downloads the subset data if the
-    data is requested throught the Send to CSV button."""
+    data is requested through the Send to CSV button."""
 
     # Format dates
     start_date_datetime = datetime.strptime(start_date, '%Y-%m-%d')
@@ -926,11 +886,11 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     if bit_type is None:
         bit_type = list(geodf.drill_type.unique())
     else:
-        bit_type = [bit_type]
+        bit_type = [bit_type.title()]
     if bore_fluid is None:
         bore_fluid = list(geodf.bore_fluid.unique())
     else:
-        bore_fluid = [bore_fluid]
+        bore_fluid = [bore_fluid.title()]
     if soil_type is None:
         soil_type = list(geodf.mod_class.unique())
     else:
@@ -944,48 +904,6 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
         button_id = 'No clicks'
     else:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    authenticated, status = authenticate(pin)
-    company_name = status['company'] if authenticated else None
-    pin_exists = True if pin not in (None, '') else False
-    login = True if login_clicks is not None and int(login_clicks) > 0 else False
-
-    company_color_dict = {
-        "Company 1": '#2dcf11',
-        "Company 2": '#4287f5',
-        "Company 3": '#db881a',
-        "Company 4": '#db1a20',
-        "Demo Company": '#82B674',
-        "Development": '#8F3191',
-        "Facebook Infrastructure": '#4A67C1',
-        "Vermeer": '#1C8343'
-    }
-
-    # if prev_log_click is not None and button_id == 'log-in':
-    #     prev_log_click -= 1
-    login_clicked = True if login_clicks is not None and prev_log_click != login_clicks else False
-    # login_clicked = True if login_clicks is not None else False
-
-    # if authenticated and pin_exists and login and login_clicked:
-    if authenticated and pin_exists and login:
-        operator = True if status['acc_type'] == "operator" else False
-        current_account = 'Logged in to: ' + str(company_name) + ' (Operator ' + str(status['operator_pin']) + ')' \
-            if operator else 'Logged in to: ' + str(company_name) + ' (Admin Account)'
-
-        if operator:
-            state = status['operator_pin']
-        else:
-            state = company_name
-        company_color = company_color_dict[str(company_name)]
-    # elif not authenticated and pin_exists and login and login_clicked:
-    elif not authenticated and pin_exists and login:
-        current_account = status
-        company_color = None
-        state = None
-    else:
-        current_account = "Enter user PIN."
-        company_color = None
-        state = None
 
     # Subset data based on button inputs
     # if username is None and password is None:
@@ -1083,7 +1001,7 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     else:
         send_to_csv = None
 
-    return map, count, hist, send_to_csv, current_account, state, company_color
+    return map, count, hist, send_to_csv
 
 
 # Callback for updating relational graph in the bottom-right
@@ -1099,6 +1017,55 @@ def update_comparison(parameter, state, company_color):
     else:
         fig = build_parameter_graph(data=geodf, parameter=parameter, company=state)
     return fig
+
+
+@app.callback(
+    [Output(component_id='current-account', component_property='children'),
+     Output(component_id='store-state', component_property='data'),
+     Output(component_id='store-color', component_property='data'),
+     Output(component_id='store-auth', component_property='data'),
+     Output(component_id='store-operator', component_property='data')
+     ],
+    [Input(component_id='log-in', component_property='n_clicks'),
+     Input(component_id='pin', component_property='value')]
+)
+def log_in(login_clicks, pin):
+    authenticated, status = authenticate(pin)
+    company_name = status['company'] if authenticated else None
+    pin_exists = True if pin not in (None, '') else False
+    login = True if login_clicks is not None and login_clicks > 0 else False
+    operator = None
+    company_color_dict = {
+        "Company 1": '#2dcf11',
+        "Company 2": '#4287f5',
+        "Company 3": '#db881a',
+        "Company 4": '#db1a20',
+        "Demo Company": '#82B674',
+        "Development": '#8F3191',
+        "Facebook Infrastructure": '#4A67C1',
+        "Vermeer": '#1C8343'
+    }
+
+    if authenticated and pin_exists and login:
+        operator = True if status['acc_type'] == "operator" else False
+        current_account = 'Logged in to: ' + str(company_name) + ' (Operator ' + str(status['operator_pin']) + ')' \
+            if operator else 'Logged in to: ' + str(company_name) + ' (Admin Account)'
+
+        if operator:
+            state = status['operator_pin']
+        else:
+            state = company_name
+        company_color = company_color_dict[str(company_name)]
+
+    elif not authenticated and pin_exists and login:
+        current_account = status
+        company_color = None
+        state = None
+    else:
+        current_account = "Enter user PIN."
+        company_color = None
+        state = None
+    return current_account, state, company_color, authenticated, operator
 
 
 if __name__ == '__main__':
