@@ -70,6 +70,7 @@ def get_company_pins():
 
 def classify_pin(company_pin, companies):
     """
+
     :param company_pin: Company pin being used to classify rows by company
     :param companies: Dictionary of unique companies
     :return:
@@ -355,13 +356,7 @@ app.layout = \
                 id='store-color'
             ),
             dcc.Store(
-                id='store-pin'
-            ),
-            dcc.Store(
-                id='store-auth'
-            ),
-            dcc.Store(
-                id='store-operator'
+                id='store-operator-labels'
             ),
             # Div for the entire container (background div)
             html.Div(
@@ -448,6 +443,33 @@ app.layout = \
                                         ],
                                     ),
 
+                                    html.Div(
+                                        id='div-for-operator',
+                                        className='div-for-dropdown',
+                                        style={
+                                            'margin-right': '10px'
+                                        },
+                                        children=[
+                                            html.P(
+                                                'Operator',
+                                                style={
+                                                    'color': settings['text'],
+                                                    'margin-bottom': '0px',
+                                                    'margin-top': '10px'
+                                                }
+                                            ),
+
+                                            dcc.Dropdown(
+                                                id='operator-dropdown',
+                                                options=[
+                                                    {'label': '', 'value': ''}
+                                                ],
+                                                value='Log In for Operator Functionality..',
+                                                placeholder='Log In for Operator Filtering..'
+                                            )
+                                        ]
+                                    ),
+
                                     # Div for Date Dropdown
                                     html.Div(
                                         id='dates',
@@ -515,9 +537,15 @@ app.layout = \
                                                    }),
                                             dcc.Dropdown(
                                                 id='bit-type',
+                                                # options=[
+                                                #     {'label': x.title(), 'value': x.lower()} for x in
+                                                #     set(geodf.drill_type)
+                                                # ],
                                                 options=[
-                                                    {'label': x.title(), 'value': x.lower()} for x in
-                                                    set(geodf.drill_type)
+                                                    {'label': 'Spoon Bit', 'value': 'spoon bit'},
+                                                    {'label': 'Roller Cone Bit', 'value': 'roller cone bit'},
+                                                    {'label': 'PDC Bit', 'value': 'pdc bit'},
+                                                    {'label': 'Other', 'value': 'other'}
                                                 ],
                                                 value=None,
                                             ),
@@ -659,7 +687,7 @@ app.layout = \
                                                 id='bottom-text',
                                                 className='text-padding',
                                                 children=[
-                                                    html.P('DrillGIS v1.2.2 - © 2021, All rights reserved.',
+                                                    html.P('DrillGIS v1.2.1 - © 2021, All rights reserved.',
                                                            style={
                                                                'margin-bottom': '0px',
                                                                'margin-top': '35px',
@@ -837,7 +865,10 @@ app.layout = \
      Output(component_id='drill-count', component_property='children'),
      Output(component_id='rop-hist', component_property='figure'),
      Output(component_id='download-csv', component_property='data'),
-     ],
+     Output(component_id='current-account', component_property='children'),
+     Output(component_id='store-state', component_property='data'),
+     Output(component_id='store-color', component_property='data'),
+     Output('store-operator-labels', 'data')],
     [Input(component_id='date-picker', component_property='start_date'),
      Input(component_id='date-picker', component_property='end_date'),
      Input(component_id='job-type-dropdown', component_property='value'),
@@ -850,24 +881,23 @@ app.layout = \
      Input(component_id='soil-type', component_property='value'),
      Input(component_id='num-bins', component_property='value'),
      Input(component_id='to-csv-button', component_property='n_clicks'),
+     Input(component_id='pin', component_property='value'),
+     Input(component_id='log-in', component_property='n_clicks'),
      Input(component_id='hist-dist', component_property='value'),
-     Input(component_id='store-auth', component_property='data'),
-     Input(component_id='store-state', component_property='data'),
-     Input(component_id='store-color', component_property='data'),
-     Input(component_id='store-operator', component_property='data')
+     Input('operator-dropdown', 'value')
      ],
     [State(component_id='to-csv-button', component_property='n_clicks'),
-     ]
+     State(component_id='log-in', component_property='n_clicks'), ]
 )
 def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam, bore_fluid, drill_depth,
-               avg_rop, soil_type, num_bins, download_click, hist_dist, authenticated, state, company_color,
-               operator, prev_n_click):
+               avg_rop, soil_type, num_bins, download_click, pin, login_clicks, hist_dist, operator_dropdown, prev_n_click,
+               prev_log_click):
     """update_map
     Inputs: All buttons from dashboard
     Outputs: Map, data count, histogram, and download
     Description: Uses all the button inputs to subset the graph and display the subset on the map and histogram. It also
     counts the rows of the data to display how many data points are being shown, and downloads the subset data if the
-    data is requested through the Send to CSV button."""
+    data is requested throught the Send to CSV button."""
 
     # Format dates
     start_date_datetime = datetime.strptime(start_date, '%Y-%m-%d')
@@ -878,7 +908,7 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     if job_type is None:
         job_type = list(geodf.job_type.unique())
     else:
-        job_type = [job_type]
+        job_type = [job_type.title()]
     if machine_model is None:
         machine_model = list(geodf.machine_model.unique())
     else:
@@ -905,9 +935,50 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     else:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
+    authenticated, status = authenticate(pin)
+    company_name = status['company'] if authenticated else None
+    pin_exists = True if pin not in (None, '') else False
+    login = True if login_clicks is not None and int(login_clicks) > 0 else False
+
+    company_color_dict = {
+        "Company 1": '#2dcf11',
+        "Company 2": '#4287f5',
+        "Company 3": '#db881a',
+        "Company 4": '#db1a20',
+    }
+
+    # if prev_log_click is not None and button_id == 'log-in':
+    #     prev_log_click -= 1
+    login_clicked = True if login_clicks is not None and prev_log_click != login_clicks else False
+    # login_clicked = True if login_clicks is not None else False
+
+    # if authenticated and pin_exists and login and login_clicked:
+    if authenticated and pin_exists and login:
+        operator = True if status['acc_type'] == "operator" else False
+        current_account = 'Logged in to: ' + str(company_name) + ' (Operator ' + str(status['operator_pin']) + ')' \
+            if operator else 'Logged in to: ' + str(company_name) + ' (Admin Account)'
+
+        if operator:
+            state = status['operator_pin']
+        else:
+            state = company_name
+        company_color = company_color_dict[str(company_name)]
+    # elif not authenticated and pin_exists and login and login_clicked:
+    elif not authenticated and pin_exists and login:
+        current_account = status
+        company_color = None
+        state = None
+    else:
+        current_account = "Enter user PIN."
+        company_color = None
+        state = None
+
     # Subset data based on button inputs
     # if username is None and password is None:
     if state is not None:
+        if operator_dropdown not in ('', 'Log In for Operator Functionality..', None):
+            state = operator_dropdown
+            operator = True
         if operator:
             geodf['Drillrun Operator'] = geodf['operator_pin'].apply(lambda x: str(state) if x == state else "Other")
             geodf['operator_class'] = geodf['operator_pin'].apply(lambda x: x if x == state else "Other")
@@ -931,6 +1002,14 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
         (geodf.avg_rop <= avg_rop[1]) &
         (geodf.mod_class.isin(soil_type))
         ]
+
+    try:
+        labels = [{'label': x, 'value': x} for x in set(geodf.operator_class)]
+        for i in labels:
+            if i['label'] == '':
+                i['label'] = 'All'
+    except AttributeError:
+        labels = []
 
     if state is not None:
         # If the data is empty (there are no runs with the parameters specified), make the figures blank
@@ -983,12 +1062,6 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     except:
         df_to_csv = df.drop(columns=['company', 'datetime'])
 
-    if not authenticated:
-        try:
-            df_to_csv = df_to_csv.drop(columns=['Drillrun Operator', 'operator_class', 'operator_pin'])
-        except:
-            pass
-
     # If the to-csv button has been clicked and the new click was the to-csv button again,
     # make the previous and current clicks different by one click
     if prev_n_click is not None and button_id == 'to-csv-button':
@@ -1001,7 +1074,7 @@ def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam
     else:
         send_to_csv = None
 
-    return map, count, hist, send_to_csv
+    return map, count, hist, send_to_csv, current_account, state, company_color, labels
 
 
 # Callback for updating relational graph in the bottom-right
@@ -1020,52 +1093,33 @@ def update_comparison(parameter, state, company_color):
 
 
 @app.callback(
-    [Output(component_id='current-account', component_property='children'),
-     Output(component_id='store-state', component_property='data'),
-     Output(component_id='store-color', component_property='data'),
-     Output(component_id='store-auth', component_property='data'),
-     Output(component_id='store-operator', component_property='data')
+    Output('div-for-operator', 'children'),
+    [Input('log-in', 'n_clicks'),
+     Input('store-operator-labels', 'data'),
+     Input('operator-dropdown', 'value')
      ],
-    [Input(component_id='log-in', component_property='n_clicks'),
-     Input(component_id='pin', component_property='value')]
+    State('div-for-operator', 'children')
 )
-def log_in(login_clicks, pin):
-    authenticated, status = authenticate(pin)
-    company_name = status['company'] if authenticated else None
-    pin_exists = True if pin not in (None, '') else False
-    login = True if login_clicks is not None and login_clicks > 0 else False
-    operator = None
-    company_color_dict = {
-        "Company 1": '#2dcf11',
-        "Company 2": '#4287f5',
-        "Company 3": '#db881a',
-        "Company 4": '#db1a20',
-        "Demo Company": '#82B674',
-        "Development": '#8F3191',
-        "Facebook Infrastructure": '#4A67C1',
-        "Vermeer": '#1C8343'
-    }
+def add_operator_dropdown(n_clicks, labels, current_dropdown, children):
+    if n_clicks is None:
+        pass
+    elif current_dropdown == 'Log In for Operator Functionality..':
+        dropdown = html.Div([
+            dcc.Dropdown(
+                id='operator-dropdown',
+                options=labels,
+            )
+        ]
+        )
+        children[1] = dropdown
 
-    if authenticated and pin_exists and login:
-        operator = True if status['acc_type'] == "operator" else False
-        current_account = 'Logged in to: ' + str(company_name) + ' (Operator ' + str(status['operator_pin']) + ')' \
-            if operator else 'Logged in to: ' + str(company_name) + ' (Admin Account)'
 
-        if operator:
-            state = status['operator_pin']
-        else:
-            state = company_name
-        company_color = company_color_dict[str(company_name)]
-
-    elif not authenticated and pin_exists and login:
-        current_account = status
-        company_color = None
-        state = None
-    else:
-        current_account = "Enter user PIN."
-        company_color = None
-        state = None
-    return current_account, state, company_color, authenticated, operator
+    # # elif len(children) != 0:
+    # #     children[0] = dropdown
+    # else:
+    # #     children.append(dropdown)
+    #     children[0] = dropdown
+    return children
 
 
 if __name__ == '__main__':
