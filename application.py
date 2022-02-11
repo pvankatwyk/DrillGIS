@@ -2,6 +2,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
+import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
@@ -687,7 +688,7 @@ app.layout = \
                                                 id='bottom-text',
                                                 className='text-padding',
                                                 children=[
-                                                    html.P('DrillGIS v1.2.1 - © 2021, All rights reserved.',
+                                                    html.P('DrillGIS v1.2.4 - © 2021, All rights reserved.',
                                                            style={
                                                                'margin-bottom': '0px',
                                                                'margin-top': '35px',
@@ -699,16 +700,7 @@ app.layout = \
                                                                'margin-bottom': '0px',
                                                                'color': settings['text']
                                                            }),
-                                                    html.P('''Change the parameters listed above to subset the current 
-                                            drilling data. The map and histogram will automatically update to show 
-                                            the parameters that were selected above, whereas the ROP vs Parameter 
-                                            comparison shows trends in the entire  dataset. This tool is property of 
-                                            Advanced Process Solutions & Middle Mile Infrastructure.''',
-                                                           style={
-                                                               'font-size': '10px',
-                                                               'color': settings['text'],
-                                                               'margin-right': '10px',
-                                                           })
+
                                                 ],
                                             ),
                                         ]
@@ -890,7 +882,8 @@ app.layout = \
      State(component_id='log-in', component_property='n_clicks'), ]
 )
 def update_map(start_date, end_date, job_type, machine_model, bit_type, bit_diam, bore_fluid, drill_depth,
-               avg_rop, soil_type, num_bins, download_click, pin, login_clicks, hist_dist, operator_dropdown, prev_n_click,
+               avg_rop, soil_type, num_bins, download_click, pin, login_clicks, hist_dist, operator_dropdown,
+               prev_n_click,
                prev_log_click):
     """update_map
     Inputs: All buttons from dashboard
@@ -1113,13 +1106,13 @@ def add_operator_dropdown(n_clicks, labels, current_dropdown, children):
         )
         children[1] = dropdown
 
-
     # # elif len(children) != 0:
     # #     children[0] = dropdown
     # else:
     # #     children.append(dropdown)
     #     children[0] = dropdown
     return children
+
 
 
 if __name__ == '__main__':
